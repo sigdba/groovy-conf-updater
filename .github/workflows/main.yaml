@@ -1,0 +1,25 @@
+name: main
+
+on:
+  push:
+    branches: ['*']
+  workflow_dispatch:
+    branches: ['*']
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Build jar
+        run: gradle shadowJar
+
+      # - name: Release
+      #   if: github.ref == 'refs/heads/main'
+      #   uses: softprops/action-gh-release@v1
+      #   with:
+      #     name: ${{ steps.release.outputs.release }}
+      #     tag_name: r${{ steps.release.outputs.release }}
+      #     fail_on_unmatched_files: true
+      #     files: packages/*-${{ steps.release.outputs.release }}.zip
