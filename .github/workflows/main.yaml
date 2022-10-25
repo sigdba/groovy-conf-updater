@@ -15,11 +15,14 @@ jobs:
       - name: Build jar
         run: gradle shadowJar
 
-      # - name: Release
-      #   if: github.ref == 'refs/heads/main'
-      #   uses: softprops/action-gh-release@v1
-      #   with:
-      #     name: ${{ steps.release.outputs.release }}
-      #     tag_name: r${{ steps.release.outputs.release }}
-      #     fail_on_unmatched_files: true
-      #     files: packages/*-${{ steps.release.outputs.release }}.zip
+      - name: Rename jar
+        run: mv app/build/libs/app-all.jar groovy-conf-updater-r${{ github.run_number }}.jar
+
+      - name: Release
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v1
+        with:
+          name: ${{ github.run_number }}
+          tag_name: r${{ github.run_number }}
+          fail_on_unmatched_files: true
+          files: groovy-conf-updater-r${{ github.run_number }}.jar
