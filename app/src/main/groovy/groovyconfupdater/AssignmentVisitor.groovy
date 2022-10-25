@@ -1,3 +1,6 @@
+package groovyconfupdater
+
+import static java.lang.System.err
 import org.codehaus.groovy.ast.builder.AstBuilder
 import org.codehaus.groovy.control.CompilePhase
 import org.codehaus.groovy.ast.ASTNode
@@ -64,48 +67,6 @@ import org.codehaus.groovy.ast.expr.VariableExpression
 import org.codehaus.groovy.ast.stmt.WhileStatement
 import org.codehaus.groovy.ast.CodeVisitorSupport
 
-class ReplacementValue {
-    public final Expression valueExpression
-    public boolean found = false
-
-    public ReplacementValue(Expression valueExpression) {
-        this.valueExpression = valueExpression
-    }
-
-    public ReplacementValue(String valueCode) {
-        def astBuilder = new AstBuilder()
-        def v = astBuilder.buildFromString(valueCode)
-        if (v.size() != 1) {
-            throw new Exception("Replacement value must contain exactly one statement.")
-        }
-        v = v[0]
-        while (true) {
-            println "v: ${v}"
-            if (v instanceof BlockStatement) {
-                def statements = v.getStatements()
-                if (statements.size() != 1) {
-                    throw new Exception("Replacement value must contain exactly one statement.")
-                }
-                v = statements[0]
-            } else if (v instanceof ReturnStatement) {
-                v = v.getExpression()
-            } else {
-                break
-            }
-        }
-
-        if (!(v instanceof Expression)) {
-            throw new Exception("Replacement value is not an expression: ${v}")
-        }
-        if (!(v instanceof ConstantExpression)) {
-            println "WARNING: Replacement value is not a constant expression. Did you forget to quote?"
-            println "         ${v}"
-        }
-        valueExpression = v
-        println "valueExpression: ${valueExpression}"
-    }
-}
-
 class AssignmentVisitor extends CodeVisitorSupport {
     private Map<String,ReplacementValue> replacements;
     private BinaryExpression binEx = null
@@ -118,22 +79,22 @@ class AssignmentVisitor extends CodeVisitorSupport {
     }
 
     private void report(String s, Closure cl) {
-        println "${' ' * depth * 2}${depth}:${ctx}:${s}"
+        err.println "${' ' * depth * 2}${depth}:${ctx}:${s}"
         depth++
         cl()
         depth--
-        println "\n\n"
+        err.println "\n\n"
     }
 
     private void checkReplacements() {
         def k = (ctx + propChain).join('.')
         if (k in replacements) {
-            println "UPDATING: ${k}"
+            err.println "UPDATING: ${k}"
             def rep = replacements[k]
             binEx.setRightExpression(rep.valueExpression)
             rep.found = true
         } else {
-            println "IGNORING: ${k}"
+            err.println "IGNORING: ${k}"
         }
     }
 
@@ -192,47 +153,3 @@ class AssignmentVisitor extends CodeVisitorSupport {
         }
     }
 }
-
-public Expression keyToPropEx(parts) {
-    def varEx = new VariableExpression(parts[0])
-    parts = parts.tail()
-    if (parts.size() < 1)
-        return varEx
-    return parts.inject(varEx) { acc, val -> new PropertyExpression(acc, new ConstantExpression(val)) }
-}
-
-def inCodeStr = new File('applicationNavigator_configuration.groovy').text
-def astBuilder = new AstBuilder()
-def inAsts = astBuilder.buildFromString(inCodeStr)
-
-if (inAsts.size() != 1) {
-    throw new Exception("input AST count != 1")
-}
-if (!(inAsts[0] instanceof BlockStatement)) {
-    throw new Exception("input AST is not a BlockStatement")
-}
-
-def writer = new StringWriter()
-def outVisitor = new AstNodeToScriptVisitor(writer)
-def asnVisitor = new AssignmentVisitor(["banner.sso.authenticationProvider":new ReplacementValue("'casio'"),
-                                        "some.other.value": new ReplacementValue("'something'")])
-
-
-for (node in inAsts) {
-    node.visit(asnVisitor)
-}
-
-def statementsToAdd = asnVisitor.getUnusedReplacements().collect {
-    new ExpressionStatement(
-        new BinaryExpression(
-            keyToPropEx(it.key.split('\\.')),
-            Token.newSymbol("=", 0, 0),
-            it.value.valueExpression
-        )
-    )
-}
-
-new BlockStatement(statementsToAdd + inAsts[0].getStatements(), inAsts[0].getVariableScope()).visit(outVisitor)
-println writer
-
-// println "${inAsts[0]}"
