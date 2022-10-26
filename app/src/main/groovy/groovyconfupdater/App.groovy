@@ -58,8 +58,12 @@ class App {
 
     static void main(String[] args) {
         def updates = System.in.readLines()
+            .collect { it.trim() }
+            .findAll { it.length() > 0 }
             .collect { it.split('=', 2) }
+            .collect { o -> o.collect { i -> i.trim() } }
             .collectEntries { [it[0], new ReplacementValue(it[1])] }
+
         updateGroovyFile(args[0], updates)
     }
 }
